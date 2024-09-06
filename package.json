@@ -1,0 +1,21 @@
+{
+    "name": "@pacm/latest_version",
+    "version": "1.0.0",
+    "main": "../../dist/pkgs/latest_version/index.js",
+    "description": "official latest_version functions for the PACM package manager",
+    "scripts": {
+        "build": "tsc"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "devDependencies": {
+        "@types/node": "^22.5.2",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.5.4"
+    },
+    "dependencies": {
+        "axios": "^1.7.7",
+        "semver": "^7.6.3"
+    }
+}
