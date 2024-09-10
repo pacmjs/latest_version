@@ -1,23 +1,61 @@
-import axios, { AxiosResponse } from "axios";
-import semver from "semver";
+import axios, { AxiosResponse } from 'axios';
+import semver from 'semver';
 
-export const getLatestVersion = async (packageName: string) => {
-    const res = (await axios.get(`https://registry.npmjs.org/${packageName}/latest`).catch(() => undefined)) as
-        | AxiosResponse<any, any>
-        | undefined;
+interface NpmRegistryResponse {
+    'dist-tags': {
+        latest: string;
+    };
+    versions: {
+        [version: string]: any;
+    };
+}
 
-    const errors: string[] = [];
-
-    if (!res || res.status !== 200) {
-        errors.push(`\nPackage ${packageName} not found`);
-        return { latestVersion: null, errors };
+const getLatestVersion = async (packageName: string): Promise<string> => {
+    try {
+        const { data } = await axios.get<NpmRegistryResponse>(`https://registry.npmjs.org/${packageName}`);
+        return data['dist-tags'].latest;
+    } catch (error: any) {
+        throw new Error(`Failed to fetch latest version for ${packageName}: ${error.message}`);
     }
-
-    const data = res.data;
-    return { latestVersion: data.version, errors };
 };
 
-export const getLatestVersionForRange = async (packageName: string, range: string) => {
+const validateVersion = async (packageName: string, version: string): Promise<string> => {
+    if (!semver.valid(version) && version !== "latest") {
+        throw new Error(`Invalid version format: ${version}`);
+    }
+
+    if (version === "latest") {
+        version = await getLatestVersion(packageName);
+    }
+
+    try {
+        await axios.get(`https://registry.npmjs.org/${packageName}/${version}`);
+        return version;
+    } catch (error: any) {
+        if (error.response && error.response.status === 404) {
+            console.log(`Version ${version === "latest" ? "ZZZZZZZ EASTER EGG ZZZZZZZ" : version} does not exist for package ${packageName}. Using latest version instead.`);
+            return await getLatestVersion(packageName);
+        } else {
+            throw new Error(`Failed to validate version ${version} for package ${packageName}: ${error.message}`);
+        }
+    }
+};
+
+const getLatestCompatibleVersion = async (packageName: string, versionRange: string): Promise<string> => {
+    try {
+        const { data } = await axios.get<NpmRegistryResponse>(`https://registry.npmjs.org/${packageName}`);
+        const versions = Object.keys(data.versions);
+        const latestCompatibleVersion = semver.maxSatisfying(versions, versionRange);
+        if (!latestCompatibleVersion) {
+            throw new Error(`No compatible version found for ${packageName} with range ${versionRange}`);
+        }
+        return latestCompatibleVersion;
+    } catch (error: any) {
+        throw new Error(`Failed to fetch latest compatible version for ${packageName}: ${error.message}`);
+    }
+};
+
+const getLatestVersionForRange = async (packageName: string, range: string) => {
     const res = (await axios.get(`https://registry.npmjs.org/${packageName}`).catch(() => undefined)) as
         | AxiosResponse<any, any>
         | undefined;
@@ -39,4 +77,11 @@ export const getLatestVersionForRange = async (packageName: string, range: strin
         .replace("=", "");
 
     return { latestVersion, errors };
+};
+
+export {
+    getLatestVersion,
+    validateVersion,
+    getLatestCompatibleVersion,
+    getLatestVersionForRange
 };
